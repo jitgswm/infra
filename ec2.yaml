@@ -1,0 +1,72 @@
+--- 
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS CloudFormation template to create a EC2.\n"
+Parameters:
+  AmiId:
+    Type: String
+    Description: Specifies the AMI ID for your instances.
+    Default: ''
+  KeyName:
+    Type: String
+    Description: >
+      Specifies the name of an existing Amazon EC2 key pair
+      to enable SSH access to the EC2 instances in your cluster.
+    Default: ''
+  InstanceType:
+    Type: String
+    Description: >
+      Specifies the EC2 instance type for your instances.
+      Defaults to t2.micro
+    Default: t2.micro
+    ConstraintDescription: must be a valid EC2 instance type.
+  VpcId: 
+    ConstraintDescription: "VPC Id must begin with 'vpc-' or leave blank to have a new VPC created\n"
+    Default: ""
+    Description: "Specifies the ID of an existing VPC. .\n"
+    Type: String
+  SubnetIds:
+    Type: String
+    Description: >
+      Specifies the Comma separated list of existing VPC Subnet
+    Default: ''
+  UserDataCommands:
+    Type: String
+    Description: >
+      Commands during launching time
+    Default: ''
+
+Resources:
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    DependsOn: Ec2SecurityGroup
+    Properties:
+        ImageId: !Ref AmiId
+        KeyName: !Ref KeyName
+        InstanceType: !Ref InstanceType
+        SubnetId: !Ref SubnetIds
+        SecurityGroupIds: [ !Ref Ec2SecurityGroup ]
+        BlockDeviceMappings:
+        -
+          DeviceName: /dev/xvdcz
+          Ebs:
+            VolumeSize: 50
+            VolumeType: gp2
+            Encrypted: true
+
+        UserData:
+            Fn::Base64:
+              !Sub |
+                #!/bin/bash -xe
+                exec > >(tee /var/log/user-data.log| logger -t user-data -s 2>/dev/console) 2>&1
+                ${UserDataCommands}
+        
+  Ec2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EC2 Security Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 122.98.9.226/32
